@@ -1,0 +1,39 @@
+name: Analyze YouTube
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install yt-dlp chat-downloader
+
+      - name: Initialize DB
+        run: python scripts/init_db.py
+
+      - name: Fetch YouTube Data
+        run: python scripts/fetch_data.py
+
+      - name: Export JSON
+        run: python scripts/export_json.py
+
+      - name: Commit JSON results
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/*.json
+          git commit -m "Daily YouTube data update" || echo "No changes"
+          git push
