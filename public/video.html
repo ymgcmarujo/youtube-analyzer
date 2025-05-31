@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>動画詳細</title>
+</head>
+<body>
+  <h1 id="title">動画詳細</h1>
+  <div id="player"></div>
+  <h2>盛り上がりコメント TOP10</h2>
+  <ul id="comments"></ul>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const videoId = params.get("video_id");
+
+    document.getElementById("player").innerHTML = `
+      <iframe width="560" height="315"
+        src="https://www.youtube.com/embed/${videoId}"
+        frameborder="0" allowfullscreen>
+      </iframe>
+    `;
+
+    fetch(`../data/comments_${videoId}.json`)
+      .then(res => res.json())
+      .then(data => {
+        const comments = data.top_comments;
+        const list = document.getElementById("comments");
+        comments.forEach(c => {
+          const li = document.createElement("li");
+          const link = `https://www.youtube.com/watch?v=${videoId}&t=${Math.max(0, c.timestamp - 60)}s`;
+          li.innerHTML = `<a href="${link}" target="_blank">[${c.timestamp}s]</a> ${c.text} <i>(${c.author})</i>`;
+          list.appendChild(li);
+        });
+      });
+  </script>
+</body>
+</html>
