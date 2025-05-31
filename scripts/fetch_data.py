@@ -48,13 +48,12 @@ def download_chat(video_id):
         "--add-header", "Accept-Encoding: gzip, deflate, br",
         "--add-header", "DNT: 1",
         "--add-header", "Connection: keep-alive",
-        "--proxy", "http://57.129.81.201:8080",  # ← 実在するプロキシを指定
         "-o", f"{CHAT_DIR}/%(id)s.%(ext)s",
         f"https://www.youtube.com/watch?v={video_id}"
     ]
 
     subprocess.run(cmd, check=False)
-
+#        "--proxy", "http://57.129.81.201:8080",  # ← 実在するプロキシを指定
 # チャットファイル（.json3）をパースしてDBに格納
 def save_chat_to_db(video_id):
     chat_file = Path(f"{CHAT_DIR}/{video_id}.live_chat.json3")
