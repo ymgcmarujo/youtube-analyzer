@@ -48,6 +48,7 @@ def download_chat(video_id):
         "--add-header", "Accept-Encoding: gzip, deflate, br",
         "--add-header", "DNT: 1",
         "--add-header", "Connection: keep-alive",
+        "--proxy", "http://57.129.81.201:8080",  # ← 実在するプロキシを指定
         "-o", f"{CHAT_DIR}/%(id)s.%(ext)s",
         f"https://www.youtube.com/watch?v={video_id}"
     ]
