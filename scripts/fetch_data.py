@@ -1,18 +1,27 @@
 import yt_dlp
-from chat_downloader import ChatDownloader
 import sqlite3
+import json
+from pathlib import Path
+import subprocess
 
 CHANNEL_URL = "https://www.youtube.com/c/GoogleDevelopers/videos"
 VIDEO_LIMIT = 1
+DATA_DIR = "data"
+CHAT_DIR = "chat"
 
-conn = sqlite3.connect("data/database.db")
+Path(DATA_DIR).mkdir(exist_ok=True)
+Path(CHAT_DIR).mkdir(exist_ok=True)
+
+conn = sqlite3.connect(f"{DATA_DIR}/database.db")
 cur = conn.cursor()
 
+# 動画一覧を取得
 def fetch_videos():
     with yt_dlp.YoutubeDL({'quiet': True, 'extract_flat': True}) as ydl:
         info = ydl.extract_info(CHANNEL_URL, download=False)
         return info['entries'][:VIDEO_LIMIT]
 
+# 動画情報を保存
 def save_video(v):
     cur.execute("""
         INSERT OR IGNORE INTO videos (video_id, title, channel, upload_date, thumbnail)
@@ -25,33 +34,52 @@ def save_video(v):
         f"https://img.youtube.com/vi/{v['id']}/hqdefault.jpg"
     ))
 
-def fetch_comments(video_id):
-    comments = []
-    try:
-        chat = ChatDownloader().get_chat(f"https://www.youtube.com/watch?v={video_id}")
-        for message in chat:
-            comments.append({
-                "timestamp": int(message.get("time_in_seconds", 0)),
-                "text": message.get("message", ""),
-                "author": message.get("author", {}).get("name", "")
-            })
-    except Exception as e:
-        print(f"❌ Error fetching comments for {video_id}: {e}")
-    return comments
+# yt-dlpでチャットコメント（字幕）をダウンロード
+def download_chat(video_id):
+    cmd = [
+        "yt-dlp",
+        "--skip-download",
+        "--write-subs",
+        "--sub-lang", "live_chat",
+        "--sub-format", "json3",
+        "-o", f"{CHAT_DIR}/%(id)s.%(ext)s",
+        f"https://www.youtube.com/watch?v={video_id}"
+    ]
+    subprocess.run(cmd, check=False)
 
-def save_comments(video_id, comments):
-    for c in comments:
-        cur.execute("""
-            INSERT INTO comments (video_id, timestamp, text, author)
-            VALUES (?, ?, ?, ?)
-        """, (video_id, c["timestamp"], c["text"], c["author"]))
+# チャットファイル（.json3）をパースしてDBに格納
+def save_chat_to_db(video_id):
+    chat_file = Path(f"{CHAT_DIR}/{video_id}.live_chat.json3")
+    if not chat_file.exists():
+        print(f"No chat file for {video_id}")
+        return
+    with open(chat_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-# 実行
-for v in fetch_videos():
+    for event in data.get("events", []):
+        timestamp_ms = int(event.get("tStartMs", 0))
+        author = event.get("author", "")
+        segments = event.get("segs", [])
+        for seg in segments:
+            text = seg.get("utf8", "").strip()
+            if text:
+                cur.execute("""
+                    INSERT INTO comments (video_id, timestamp, text, author)
+                    VALUES (?, ?, ?, ?)
+                """, (
+                    video_id,
+                    timestamp_ms // 1000,
+                    text,
+                    author
+                ))
+
+# 実行処理
+videos = fetch_videos()
+for v in videos:
     save_video(v)
-    comments = fetch_comments(v['id'])
-    save_comments(v['id'], comments)
+    download_chat(v["id"])
+    save_chat_to_db(v["id"])
 
 conn.commit()
 conn.close()
-print("✅ Fetch complete")
+print("✅ Chat data fetched and stored.")
