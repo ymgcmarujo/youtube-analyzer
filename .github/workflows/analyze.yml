@@ -21,6 +21,10 @@ jobs:
         run: |
           pip install yt-dlp chat-downloader
 
+      - name: Upgrade yt-dlp to latest
+        run: pip install -U yt-dlp
+
+
       - name: Initialize DB
         run: python scripts/init_db.py
 
