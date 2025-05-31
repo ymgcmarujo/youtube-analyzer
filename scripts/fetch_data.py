@@ -40,10 +40,12 @@ def download_chat(video_id):
         "yt-dlp",
         "--skip-download",
         "--write-subs",
+        "--write-auto-sub",
+        "--get-comments",  # ← 通常コメント取得
         "--sub-lang", "live_chat",
         "--sub-format", "json3",
         "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "--add-header", "Referer: https://www.youtube.com/",
+        "--add-header", f"Referer: https://www.youtube.com/watch?v={video_id}",
         "--add-header", "Accept-Language: ja,en-US;q=0.9,en;q=0.8",
         "--add-header", "Accept-Encoding: gzip, deflate, br",
         "--add-header", "DNT: 1",
@@ -53,6 +55,7 @@ def download_chat(video_id):
     ]
 
     subprocess.run(cmd, check=False)
+
 #        "--proxy", "http://57.129.81.201:8080",  # ← 実在するプロキシを指定
 # チャットファイル（.json3）をパースしてDBに格納
 def save_chat_to_db(video_id):
