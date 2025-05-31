@@ -42,9 +42,16 @@ def download_chat(video_id):
         "--write-subs",
         "--sub-lang", "live_chat",
         "--sub-format", "json3",
+        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "--add-header", "Referer: https://www.youtube.com/",
+        "--add-header", "Accept-Language: ja,en-US;q=0.9,en;q=0.8",
+        "--add-header", "Accept-Encoding: gzip, deflate, br",
+        "--add-header", "DNT: 1",
+        "--add-header", "Connection: keep-alive",
         "-o", f"{CHAT_DIR}/%(id)s.%(ext)s",
         f"https://www.youtube.com/watch?v={video_id}"
     ]
+
     subprocess.run(cmd, check=False)
 
 # チャットファイル（.json3）をパースしてDBに格納
