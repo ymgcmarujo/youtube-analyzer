@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 
-CHANNEL_URL = "https://www.youtube.com/c/GoogleDevelopers/videos"
+CHANNEL_URL = "https://www.youtube.com/@dozle/videos"
 VIDEO_LIMIT = 1
 DATA_DIR = "data"
 CHAT_DIR = "chat"
