@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 #from api import database
 import database
+from pathlib import Path
+import os
+import requests
 
 app = FastAPI()
 
