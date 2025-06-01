@@ -16,9 +16,8 @@ DB_PATH = Path(__file__).resolve().parent.parent / "database" / "database.db"
 GITHUB_DB_URL = "https://github.com/ymgcmarujo/youtube-analyzer/releases/download/v1/database.db"
 
 def download_db():
-    #if os.path.exists(DB_PATH):
-    #    print("✅ DB already exists. Skipping download.")
-    #    return
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
     print("⬇️ Downloading database from GitHub Releases...")
     response = requests.get(GITHUB_DB_URL)
     if response.status_code == 200:
