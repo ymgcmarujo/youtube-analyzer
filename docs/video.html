@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>動画詳細</title>
+  <script src="script.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+    }
+
+    #player-container {
+      position: sticky;
+      top: 0;
+      background: white;
+      padding: 10px;
+      border-bottom: 2px solid #ccc;
+      z-index: 1000;
+    }
+
+    .scene {
+      cursor: pointer;
+      padding: 5px;
+      margin: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      background-color: #f9f9f9;
+    }
+
+    .scene:hover {
+      background-color: #eef;
+    }
+
+    .comments-box {
+      max-height: 120px;
+      overflow-y: auto;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      margin-top: 5px;
+      padding: 5px;
+      font-size: 0.9em;
+    }
+
+    h2, h3 {
+      margin-left: 10px;
+    }
+
+    #scenes {
+      padding-bottom: 40px;
+    }
+
+    .search-result {
+        border: 1px solid #ccc;
+        background: #fdfdfd;
+        padding: 5px 10px;
+        margin: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .search-result:hover {
+        background-color: #eef;
+    }
+    .search-results-container {
+        max-height: 200px;
+        overflow-y: auto;
+        margin: 10px;
+        border: 1px solid #ddd;
+        padding: 5px;
+        background: #fff;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="player-container">
+    <h1>動画詳細</h1>
+
+    <input type="text" id="video-search-box" placeholder="この動画内でコメント検索">
+    <button onclick="handleVideoSearch()">検索</button>
+    <div id="video-search-results"></div>
+    
+    <div id="player"></div>
+  </div>
+
+  <h2>盛り上がりシーン TOP10</h2>
+  <ul id="scenes"></ul>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoId = urlParams.get("video_id");
+
+    const player = document.getElementById("player");
+
+    function updatePlayer(startSeconds) {
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?start=${startSeconds}&autoplay=1`;
+    player.innerHTML = `<iframe width="560" height="315"
+        src="${embedUrl}"
+        frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen></iframe>`;
+    }
+
+    function timeStrToSeconds(timeStr) {
+    const [min, sec] = timeStr.split(":").map(Number);
+    return min * 60 + sec;
+    }
+
+    fetchHighlights(videoId).then(data => {
+      const ul = document.getElementById("scenes");
+
+      const renderGroup = (group, label) => {
+        const title = document.createElement("h3");
+        title.textContent = `${label}`;
+        ul.appendChild(title);
+
+        group.forEach((scene, index) => {
+          const li = document.createElement("li");
+          li.className = "scene";
+
+          const commentsHtml = scene.comments.map(c => `<div>(${c.t}) ${c.c}</div>`).join("");
+
+          li.innerHTML = `
+            <div><strong>第${index + 1}位 [${scene.t}]</strong>（${scene.n}件）</div>
+            <div class="comments-box">${commentsHtml}</div>
+          `;
+
+        li.addEventListener("click", () => {
+        let sec = timeStrToSeconds(scene.t);
+        sec = Math.max(0, sec - 30); // ← ここが30秒前に補正してるポイント！
+        updatePlayer(sec);
+        });
+
+          ul.appendChild(li);
+        });
+      };
+
+      renderGroup(data.top_comment_count, "🗨️ コメント数ランキング");
+      renderGroup(data.top_keywords_count, "🔥 盛り上がりワードランキング");
+
+      if (data.top_comment_count.length > 0) {
+        updatePlayer(timeStrToSeconds(data.top_comment_count[0].t));
+      }
+    });
+
+    async function searchVideoComments(keyword, videoId) {
+    const res = await fetch(`${API_BASE}/search?keyword=${encodeURIComponent(keyword)}&video_id=${videoId}`);
+    return await res.json();
+    }
+
+    function handleVideoSearch() {
+    const keyword = document.getElementById("video-search-box").value.trim();
+    if (!keyword) return;
+
+    searchVideoComments(keyword, videoId).then(results => {
+        const container = document.getElementById("video-search-results");
+        container.innerHTML = `<h3>検索結果（${results.length}件）</h3>`;
+
+        if (results.length === 0) {
+        container.innerHTML += "<p>一致するコメントは見つかりませんでした。</p>";
+        return;
+        }
+
+        const resultsBox = document.createElement("div");
+        resultsBox.className = "search-results-container";
+
+        results.forEach(c => {
+        const div = document.createElement("div");
+        div.className = "search-result";
+        div.innerHTML = `<strong>(${c.timestamp})</strong> ${c.content}`;
+        div.addEventListener("click", () => {
+            let sec = timeStrToSeconds(c.timestamp);
+            sec = Math.max(0, sec - 30); // 30秒前から再生
+            updatePlayer(sec);
+        });
+        resultsBox.appendChild(div);
+        });
+
+        container.appendChild(resultsBox);
+    });
+    }
+
+    function getQueryParam(param) {
+    const url = new URL(window.location.href);
+    return url.searchParams.get(param);
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+    const keywordFromURL = getQueryParam("keyword");
+    if (keywordFromURL) {
+        document.getElementById("video-search-box").value = keywordFromURL;
+        handleVideoSearch(); // 自動検索実行
+    }
+    });
+
+  </script>
+</body>
+</html>

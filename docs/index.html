@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>YouTube動画一覧</title>
+  <style>
+    .video {
+      border: 1px solid #ccc;
+      margin-bottom: 10px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+    }
+    .video img {
+      margin-right: 10px;
+    }
+    .pagination {
+      margin-top: 20px;
+    }
+    .uploader-checkboxes label {
+      display: inline-block;
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>動画一覧</h1>
+
+  <input type="text" id="search-box" placeholder="キーワードでコメント・タイトル検索">
+  <button onclick="handleSearch()">検索</button>
+  <button id="clear-search-btn" onclick="clearSearch()">検索結果をクリア</button>
+
+  <br>
+  <label>アップロード者:</label>
+  <div id="uploader-checkboxes" class="uploader-checkboxes"></div>
+
+  <label>公開日:</label>
+  <input type="date" id="published-after"> ～ 
+  <input type="date" id="published-before">
+  <button onclick="clearFilters()">フィルターをリセット</button>
+
+  <div id="search-results"></div>
+  <div id="video-list"></div>
+  <div class="pagination">
+    <button onclick="changePage(-1)">前へ</button>
+    <span id="page-num">1</span>
+    <button onclick="changePage(1)">次へ</button>
+  </div>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:8000";
+    let currentPage = 1;
+    let totalPages = 1;
+    let isSearchMode = false;
+    let currentKeyword = "";
+    let currentVideos = [];
+    let allVideos = [];
+
+    async function fetchVideos(page) {
+    const res = await fetch(`${API_BASE}/videos?page=${page}&page_size=20`);
+    const data = await res.json();
+    currentVideos = data.videos;
+    totalPages = Math.ceil(data.total_count / 20);
+
+    if (page === 1) {
+        allVideos = currentVideos;
+        populateUploaderCheckboxes(allVideos);
+    }
+
+    renderFilteredVideos(currentVideos);
+    renderPagination(data.total_count);
+    }
+
+    async function handleSearch() {
+      const keyword = document.getElementById("search-box").value.trim();
+      if (!keyword) return;
+
+      document.getElementById("video-list").style.display = "none";
+      document.getElementById("search-results").innerHTML = "<p>検索中...</p>";
+
+      const res = await fetch(`${API_BASE}/search?keyword=${encodeURIComponent(keyword)}`);
+      const results = await res.json();
+      const grouped = {};
+      results.forEach(r => {
+        if (!grouped[r.video_id]) grouped[r.video_id] = [];
+        grouped[r.video_id].push(r);
+      });
+
+      const container = document.getElementById("search-results");
+      container.innerHTML = `<h3>「${keyword}」の検索結果 (${results.length}件)</h3>`;
+
+      for (const videoId in grouped) {
+        try {
+          const meta = await fetch(`${API_BASE}/videos?video_id=${videoId}`).then(res => res.json());
+          if (!meta || !meta.title) continue;
+
+          const thumb = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+          const div = document.createElement("div");
+          div.className = "video";
+          div.innerHTML = `
+            <img src="${thumb}" width="120" style="float:left; margin-right:10px;">
+            <div style="overflow:hidden;">
+              <a href="video.html?video_id=${videoId}&keyword=${encodeURIComponent(keyword)}"><strong>${meta.title}</strong></a><br>
+              公開日: ${meta.published_at || "不明"}<br>
+              アップロード者: ${meta.uploader || "不明"}<br>
+              <div class="comments-box" style="max-height:150px; overflow-y:auto;">
+                ${grouped[videoId].map(c => `<div>(${c.timestamp}) ${c.content}</div>`).join("")}
+              </div>
+            </div>
+            <div style="clear:both;"></div>
+          `;
+          container.appendChild(div);
+        } catch (e) {
+          console.warn(`メタ情報取得失敗: ${videoId}`, e);
+        }
+      }
+    }
+
+    function populateUploaderCheckboxes(videos) {
+      const uploaderSet = new Set(videos.map(v => v.uploader).filter(Boolean));
+      const container = document.getElementById("uploader-checkboxes");
+      container.innerHTML = "";
+      uploaderSet.forEach(u => {
+        const id = `uploader-${u}`;
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = u;
+        checkbox.id = id;
+        checkbox.addEventListener("change", () => {
+          currentPage = 1;
+          renderFilteredVideos(currentVideos);
+        });
+
+        const label = document.createElement("label");
+        label.htmlFor = id;
+        label.textContent = u;
+
+        container.appendChild(checkbox);
+        container.appendChild(label);
+      });
+    }
+
+    function parseDateStr(yyyymmdd) {
+      if (!yyyymmdd || yyyymmdd.length !== 8) return null;
+      return new Date(`${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`);
+    }
+
+    function getSelectedUploaders() {
+      return Array.from(document.querySelectorAll('#uploader-checkboxes input:checked')).map(cb => cb.value);
+    }
+
+    function applyFilters(videos) {
+      const selectedUploaders = getSelectedUploaders();
+      const after = document.getElementById("published-after").value;
+      const before = document.getElementById("published-before").value;
+
+      return videos.filter(v => {
+        const videoDate = parseDateStr(v.published_at);
+        const afterDate = after ? new Date(after) : null;
+        const beforeDate = before ? new Date(before) : null;
+        const dateOk = (!afterDate || videoDate >= afterDate) && (!beforeDate || videoDate <= beforeDate);
+        const uploaderOk = selectedUploaders.length === 0 || selectedUploaders.includes(v.uploader);
+        return dateOk && uploaderOk;
+      });
+    }
+
+    function renderPagination(totalCount) {
+    const pageSize = 20; // backendと一致させる
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const pagination = document.querySelector(".pagination");
+    pagination.innerHTML = ""; // 前の内容をクリア
+
+    for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i;
+        //btn.disabled = (i === currentPage); // 現在ページは無効に
+        btn.addEventListener("click", () => {
+        currentPage = i;
+        fetchVideos(currentPage);
+        });
+        pagination.appendChild(btn);
+    }
+    }
+
+
+    function renderFilteredVideos(videos) {
+        const filtered = applyFilters(videos); // ※このfilteringはページ内だけに適用
+        const list = document.getElementById("video-list");
+        list.innerHTML = "";
+        document.getElementById("search-results").innerHTML = "";
+
+        filtered.forEach(v => {
+            const div = document.createElement("div");
+            const thumb = `https://i.ytimg.com/vi/${v.video_id}/hqdefault.jpg`;
+            div.className = "video";
+            div.innerHTML = `
+            <img src="${thumb}" width="120" />
+            <div>
+                <a href="video.html?video_id=${v.video_id}"><strong>${v.title}</strong></a><br>
+                公開日: ${v.published_at || "不明"}<br>
+                アップロード者: ${v.uploader || "不明"}
+            </div>
+            `;
+            list.appendChild(div);
+        });
+
+        document.getElementById("page-num").innerText = currentPage;
+    }
+
+    function changePage(diff) {
+      const newPage = currentPage + diff;
+      if (newPage < 1 || newPage > totalPages) return;
+      currentPage = newPage;
+      fetchVideos(currentPage);
+    }
+
+    function clearSearch() {
+      isSearchMode = false;
+      currentKeyword = "";
+      document.getElementById("search-results").innerHTML = "";
+      document.getElementById("video-list").style.display = "block";
+      document.getElementById("search-box").value = "";
+      currentPage = 1;
+      fetchVideos(currentPage);
+    }
+
+    function clearFilters() {
+      document.querySelectorAll('#uploader-checkboxes input').forEach(cb => cb.checked = false);
+      document.getElementById("published-after").value = "";
+      document.getElementById("published-before").value = "";
+      renderFilteredVideos(currentVideos);
+    }
+
+    document.getElementById("published-after").addEventListener("change", () => {
+      currentPage = 1;
+      renderFilteredVideos(currentVideos);
+    });
+    document.getElementById("published-before").addEventListener("change", () => {
+      currentPage = 1;
+      renderFilteredVideos(currentVideos);
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+      fetchVideos(currentPage);
+      const urlParams = new URLSearchParams(window.location.search);
+      const keyword = urlParams.get("keyword");
+      if (keyword) {
+        document.getElementById("search-box").value = keyword;
+        handleSearch();
+      }
+    });
+  </script>
+</body>
+</html>
