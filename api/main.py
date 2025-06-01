@@ -12,6 +12,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+DB_PATH = Path(__file__).resolve().parent.parent / "database" / "database.db"
+GITHUB_DB_URL = "https://github.com/ymgcmarujo/youtube-analyzer/releases/download/v1/database.db"
+
 @app.get("/")
 def root():
     return {"message": "YouTube分析API"}
