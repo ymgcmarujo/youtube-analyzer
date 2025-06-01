@@ -15,6 +15,19 @@ app.add_middleware(
 DB_PATH = Path(__file__).resolve().parent.parent / "database" / "database.db"
 GITHUB_DB_URL = "https://github.com/ymgcmarujo/youtube-analyzer/releases/download/v1/database.db"
 
+def download_db():
+    #if os.path.exists(DB_PATH):
+    #    print("✅ DB already exists. Skipping download.")
+    #    return
+    print("⬇️ Downloading database from GitHub Releases...")
+    response = requests.get(GITHUB_DB_URL)
+    if response.status_code == 200:
+        with open(DB_PATH, "wb") as f:
+            f.write(response.content)
+        print("✅ Download complete.")
+    else:
+        print(f"❌ Failed to download DB: {response.status_code}")
+
 @app.get("/")
 def root():
     return {"message": "YouTube分析API"}
