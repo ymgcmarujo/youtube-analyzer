@@ -31,6 +31,18 @@ def download_db():
     else:
         print(f"❌ Failed to download DB: {response.status_code}")
 
+@app.on_event("startup")
+def startup_event():
+    download_db()
+    # DB接続確認（任意）
+#    try:
+#        conn = sqlite3.connect(DB_PATH)
+#        conn.execute("SELECT sysdate FROM aster WHERE type='table';")
+#        print("✅ DB connection OK.")
+#        conn.close()
+#    except Exception as e:
+#        print(f"❌ DB error: {e}")
+
 @app.get("/")
 def root():
     return {"message": "YouTube分析API"}
