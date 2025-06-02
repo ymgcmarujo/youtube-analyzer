@@ -14,7 +14,7 @@ def get_video_list(page: int = 1, page_size: int = 20):
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT COUNT(*) FROM videos
+        SELECT COUNT(*) FROM videos WHERE status = '取得済'
     """)
     total_count = cursor.fetchone()[0]
     print(total_count)
