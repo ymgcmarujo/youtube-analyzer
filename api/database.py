@@ -21,6 +21,7 @@ def get_video_list(page: int = 1, page_size: int = 20):
     cursor.execute("""
         SELECT video_id, title, published_at, uploader, video_type
         FROM videos
+        WHERE status = '取得済'
         ORDER BY published_at DESC
         LIMIT ? OFFSET ?
     """, (page_size, offset))
